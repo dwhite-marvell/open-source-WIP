@@ -1,0 +1,73 @@
+diff -r f7508df74a5b make/ide/netbeans/hotspot/nbproject/configurations.xml
+--- a/make/ide/netbeans/hotspot/nbproject/configurations.xml	Wed Aug 19 15:57:47 2020 -0400
++++ b/make/ide/netbeans/hotspot/nbproject/configurations.xml	Wed Oct 28 17:01:30 2020 -0400
+@@ -17,11 +17,19 @@
+   <projectmakefile>../../Makefile</projectmakefile>
+   <confs>
+     <conf name="Mac_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>${MAKE} -f Makefile images</buildCommand>
+           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -30,11 +38,19 @@
+       </makefileType>
+     </conf>
+     <conf name="Linux_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>${MAKE} -f Makefile images</buildCommand>
+           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -43,6 +59,13 @@
+       </makefileType>
+     </conf>
+     <conf name="Windws64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../../../output</buildCommandWorkingDir>
+diff -r f7508df74a5b make/ide/netbeans/hotspot/nbproject/project.xml
+--- a/make/ide/netbeans/hotspot/nbproject/project.xml	Wed Aug 19 15:57:47 2020 -0400
++++ b/make/ide/netbeans/hotspot/nbproject/project.xml	Wed Oct 28 17:01:30 2020 -0400
+@@ -4,9 +4,9 @@
+     <configuration>
+         <data xmlns="http://www.netbeans.org/ns/make-project/1">
+             <name>OpenJDK (Native)</name>
+-            <c-extensions>c,m</c-extensions>
+-            <cpp-extensions>cc,cpp</cpp-extensions>
+-            <header-extensions>ad,h,hh,hpp,in_out,map,txt</header-extensions>
++            <c-extensions/>
++            <cpp-extensions/>
++            <header-extensions>txt</header-extensions>
+             <sourceEncoding>UTF-8</sourceEncoding>
+             <make-dep-projects/>
+             <sourceRootList>

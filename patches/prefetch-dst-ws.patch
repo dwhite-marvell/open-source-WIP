@@ -1,0 +1,39 @@
+diff -r abf1d797e380 src/hotspot/cpu/aarch64/stubGenerator_aarch64.cpp
+--- a/src/hotspot/cpu/aarch64/stubGenerator_aarch64.cpp	Wed Jan 03 17:29:20 2018 +0000
++++ b/src/hotspot/cpu/aarch64/stubGenerator_aarch64.cpp	Wed Oct 28 16:50:53 2020 -0400
+@@ -879,8 +879,10 @@
+ 
+     __ bind(again);
+ 
+-    if (PrefetchCopyIntervalInBytes > 0)
++    if (PrefetchCopyIntervalInBytes > 0) {
+       __ prfm(use_stride ? Address(s, stride) : Address(s, prefetch), PLDL1KEEP);
++      __ prfm(use_stride ? Address(d, stride) : Address(d, prefetch), PSTL1KEEP);
++    }
+ 
+     if (UseSIMDForMemoryOps) {
+       __ stpq(v0, v1, Address(d, 4 * unit));
+@@ -1011,8 +1013,10 @@
+ 
+       __ bind(again);
+ 
+-      if (PrefetchCopyIntervalInBytes > 0)
++      if (PrefetchCopyIntervalInBytes > 0) {
+         __ prfm(use_stride ? Address(s, stride) : Address(s, prefetch), PLDL1KEEP);
++        __ prfm(use_stride ? Address(d, stride) : Address(d, prefetch), PSTL1KEEP);
++      }
+ 
+       if (direction == copy_forwards) {
+        // allowing for the offset of -8 the store instructions place
+diff -r abf1d797e380 src/hotspot/share/gc/parallel/psPromotionManager.inline.hpp
+--- a/src/hotspot/share/gc/parallel/psPromotionManager.inline.hpp	Wed Jan 03 17:29:20 2018 +0000
++++ b/src/hotspot/share/gc/parallel/psPromotionManager.inline.hpp	Wed Oct 28 16:50:53 2020 -0400
+@@ -208,6 +208,8 @@
+ 
+     assert(new_obj != NULL, "allocation should have succeeded");
+ 
++    Prefetch::write((HeapWord*)new_obj, PrefetchCopyIntervalInBytes);
++
+     // Copy obj
+     Copy::aligned_disjoint_words((HeapWord*)o, (HeapWord*)new_obj, new_obj_size);
+ 
