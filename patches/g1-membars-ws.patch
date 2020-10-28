@@ -1,0 +1,45 @@
+diff -r cf88c15d9171 src/hotspot/share/gc/g1/g1ParScanThreadState.cpp
+--- a/src/hotspot/share/gc/g1/g1ParScanThreadState.cpp	Wed Jun 13 08:44:23 2018 -0700
++++ b/src/hotspot/share/gc/g1/g1ParScanThreadState.cpp	Wed Oct 28 16:35:03 2020 -0400
+@@ -266,7 +266,7 @@
+   Prefetch::write(obj_ptr, PrefetchCopyIntervalInBytes);
+ 
+   const oop obj = oop(obj_ptr);
+-  const oop forward_ptr = old->forward_to_atomic(obj);
++  const oop forward_ptr = old->forward_to_atomic(obj, memory_order_relaxed);
+   if (forward_ptr == NULL) {
+     Copy::aligned_disjoint_words((HeapWord*) old, obj_ptr, word_sz);
+ 
+diff -r cf88c15d9171 src/hotspot/share/oops/oop.hpp
+--- a/src/hotspot/share/oops/oop.hpp	Wed Jun 13 08:44:23 2018 -0700
++++ b/src/hotspot/share/oops/oop.hpp	Wed Oct 28 16:35:03 2020 -0400
+@@ -266,7 +266,7 @@
+   // Exactly one thread succeeds in inserting the forwarding pointer, and
+   // this call returns "NULL" for that thread; any other thread has the
+   // value of the forwarding pointer returned and does not modify "this".
+-  inline oop forward_to_atomic(oop p);
++  inline oop forward_to_atomic(oop p, atomic_memory_order order = memory_order_conservative);
+ 
+   inline oop forwardee() const;
+   inline oop forwardee_acquire() const;
+diff -r cf88c15d9171 src/hotspot/share/oops/oop.inline.hpp
+--- a/src/hotspot/share/oops/oop.inline.hpp	Wed Jun 13 08:44:23 2018 -0700
++++ b/src/hotspot/share/oops/oop.inline.hpp	Wed Oct 28 16:35:03 2020 -0400
+@@ -352,7 +352,7 @@
+   return cas_set_mark_raw(m, compare, order) == compare;
+ }
+ 
+-oop oopDesc::forward_to_atomic(oop p) {
++oop oopDesc::forward_to_atomic(oop p, atomic_memory_order order) {
+   markOop oldMark = mark_raw();
+   markOop forwardPtrMark = markOopDesc::encode_pointer_as_mark(p);
+   markOop curMark;
+@@ -361,7 +361,7 @@
+   assert(sizeof(markOop) == sizeof(intptr_t), "CAS below requires this.");
+ 
+   while (!oldMark->is_marked()) {
+-    curMark = cas_set_mark_raw(forwardPtrMark, oldMark);
++    curMark = cas_set_mark_raw(forwardPtrMark, oldMark, order);
+     assert(is_forwarded(), "object should have been forwarded");
+     if (curMark == oldMark) {
+       return NULL;

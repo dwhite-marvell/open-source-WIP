@@ -1,0 +1,101 @@
+diff -r e568ce785bdf make/nb_native/nbproject/configurations.xml
+--- a/make/nb_native/nbproject/configurations.xml	Fri Feb 07 00:17:01 2020 +0100
++++ b/make/nb_native/nbproject/configurations.xml	Wed Oct 28 16:22:16 2020 -0400
+@@ -17,11 +17,19 @@
+   <projectmakefile>../../Makefile</projectmakefile>
+   <confs>
+     <conf name="Mac_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>${MAKE} -f Makefile images</buildCommand>
+           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -30,11 +38,19 @@
+       </makefileType>
+     </conf>
+     <conf name="Linux_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>${MAKE} -f Makefile images</buildCommand>
+           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -43,11 +59,19 @@
+       </makefileType>
+     </conf>
+     <conf name="Solaris_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>gmake -f Makefile images</buildCommand>
+           <cleanCommand>gmake -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -56,6 +80,13 @@
+       </makefileType>
+     </conf>
+     <conf name="Windws64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../../../output</buildCommandWorkingDir>
+diff -r e568ce785bdf make/nb_native/nbproject/project.xml
+--- a/make/nb_native/nbproject/project.xml	Fri Feb 07 00:17:01 2020 +0100
++++ b/make/nb_native/nbproject/project.xml	Wed Oct 28 16:22:16 2020 -0400
+@@ -5,7 +5,7 @@
+         <data xmlns="http://www.netbeans.org/ns/make-project/1">
+             <name>OpenJDK (Native)</name>
+             <c-extensions>c,m</c-extensions>
+-            <cpp-extensions>cc,cpp</cpp-extensions>
++            <cpp-extensions>cc,cpp,mm</cpp-extensions>
+             <header-extensions>ad,h,hh,hpp,in_out,map,txt</header-extensions>
+             <sourceEncoding>UTF-8</sourceEncoding>
+             <make-dep-projects/>
+diff -r e568ce785bdf src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp
+--- a/src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp	Fri Feb 07 00:17:01 2020 +0100
++++ b/src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp	Wed Oct 28 16:22:16 2020 -0400
+@@ -1424,7 +1424,7 @@
+     bind(*retaddr);
+ 
+   ldp(rscratch1, rmethod, Address(post(sp, 2 * wordSize)));
+-  maybe_isb();
++//  maybe_isb();
+ }
+ 
+ void MacroAssembler::call_VM_leaf(address entry_point, int number_of_arguments) {

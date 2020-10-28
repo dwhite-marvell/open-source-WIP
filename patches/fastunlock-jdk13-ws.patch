@@ -1,0 +1,144 @@
+diff -r b31780c0c4c9 make/nb_native/nbproject/configurations.xml
+--- a/make/nb_native/nbproject/configurations.xml	Fri Mar 01 10:00:03 2019 -0800
++++ b/make/nb_native/nbproject/configurations.xml	Wed Oct 28 16:17:57 2020 -0400
+@@ -17,11 +17,19 @@
+   <projectmakefile>../../Makefile</projectmakefile>
+   <confs>
+     <conf name="Mac_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>${MAKE} -f Makefile images</buildCommand>
+           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -30,11 +38,19 @@
+       </makefileType>
+     </conf>
+     <conf name="Linux_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>${MAKE} -f Makefile images</buildCommand>
+           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -43,11 +59,19 @@
+       </makefileType>
+     </conf>
+     <conf name="Solaris_64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../..</buildCommandWorkingDir>
+           <buildCommand>gmake -f Makefile images</buildCommand>
+           <cleanCommand>gmake -f Makefile clean</cleanCommand>
++          <executablePath></executablePath>
+         </makeTool>
+         <preBuild>
+           <preBuildCommandWorkingDir>../..</preBuildCommandWorkingDir>
+@@ -56,6 +80,13 @@
+       </makefileType>
+     </conf>
+     <conf name="Windws64" type="0">
++      <toolsSet>
++        <compilerSet>default</compilerSet>
++        <dependencyChecking>false</dependencyChecking>
++        <rebuildPropChanged>false</rebuildPropChanged>
++      </toolsSet>
++      <codeAssistance>
++      </codeAssistance>
+       <makefileType>
+         <makeTool>
+           <buildCommandWorkingDir>../../../output</buildCommandWorkingDir>
+diff -r b31780c0c4c9 src/hotspot/cpu/aarch64/aarch64.ad
+--- a/src/hotspot/cpu/aarch64/aarch64.ad	Fri Mar 01 10:00:03 2019 -0800
++++ b/src/hotspot/cpu/aarch64/aarch64.ad	Wed Oct 28 16:17:57 2020 -0400
+@@ -3515,18 +3515,62 @@
+     // Handle existing monitor.
+     __ bind(object_has_monitor);
+     __ add(tmp, tmp, -markOopDesc::monitor_value); // monitor
++ #ifdef ASSERT
++    // 11 instr, 2 branches (max)
++    // Check for still being owner. bail out to slow case if not, which will assert
+     __ ldr(rscratch1, Address(tmp, ObjectMonitor::owner_offset_in_bytes()));
+     __ ldr(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes()));
+     __ eor(rscratch1, rscratch1, rthread); // Will be 0 if we are the owner.
+     __ orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if there are 0 recursions
+     __ cmp(rscratch1, zr); // Sets flags for result
++    
+     __ br(Assembler::NE, cont);
+ 
+     __ ldr(rscratch1, Address(tmp, ObjectMonitor::EntryList_offset_in_bytes()));
+     __ ldr(disp_hdr, Address(tmp, ObjectMonitor::cxq_offset_in_bytes()));
+     __ orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
+     __ cmp(rscratch1, zr); // Sets flags for result
+-    __ cbnz(rscratch1, cont);
++    __ br(Assembler::NE, cont);
++#else
++    int x = 1;
++    if (x == 1) { // 8 instr, 2 branches (max)
++        
++        
++        :
++      __ ldr(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes()));
++      __ cmp(disp_hdr, zr); // Sets flags for result. Goto slow case if recursive
++      __ br(Assembler::NE, cont);
++
++      __ ldr(rscratch1, Address(tmp, ObjectMonitor::EntryList_offset_in_bytes()));
++      __ ldr(disp_hdr, Address(tmp, ObjectMonitor::cxq_offset_in_bytes()));
++      __ orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
++      __ cmp(rscratch1, zr); // Sets flags for result
++      __ br(Assembler::NE, cont);
++    } else if (x == 2) { // 7 instr, 1 branches. 2 unnecessary loads when calling out to slow case (but who cares at that point):
++      __ ldr(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes()));
++      __ ldr(rscratch1, Address(tmp, ObjectMonitor::EntryList_offset_in_bytes()));
++      __ orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
++      __ ldr(disp_hdr, Address(tmp, ObjectMonitor::cxq_offset_in_bytes()));
++      __ orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
++      __ cmp(rscratch1, zr); // Sets flags for result
++      __ br(Assembler::NE, cont);
++    } else {  // 11 instr, 2 branches (max), handles recursive case inline:
++      __ ldr(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes()));
++      __ cbz(disp_hdr, handle_zero_recursion); // last unlock - try for fast unlock
++      __ sub(disp_hdr, disp_hdr, 1);
++      __ str(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes())); // decr recursion
++      __ cmp(zr, zr); // set result to success
++      __ b(cont);
++      
++      __ bind(handle_zero_recursion);
++      __ ldr(rscratch1, Address(tmp, ObjectMonitor::EntryList_offset_in_bytes()));
++      __ ldr(disp_hdr, Address(tmp, ObjectMonitor::cxq_offset_in_bytes()));
++      __ orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
++      __ cmp(rscratch1, zr); // Sets flags for result
++      __ br(Assembler::NE, cont);
++    }
++#endif
++    
+     // need a release store here
+     __ lea(tmp, Address(tmp, ObjectMonitor::owner_offset_in_bytes()));
+     __ stlr(zr, tmp); // set unowned

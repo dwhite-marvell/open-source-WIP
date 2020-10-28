@@ -1,0 +1,212 @@
+diff -r 41779d3b85e1 make/nb_native/nbproject/configurations.xml
+--- a/make/nb_native/nbproject/configurations.xml	Fri Jan 04 11:03:53 2019 -0500
++++ b/make/nb_native/nbproject/configurations.xml	Wed Oct 28 16:29:34 2020 -0400
+@@ -6150,12 +6150,6 @@
+                 <df name="IsModifiableModule">
+                   <in>libIsModifiableModuleTest.c</in>
+                 </df>
+-                <df name="HeapMonitorModule">
+-                  <in>libHeapMonitorTest.c</in>
+-                </df>
+-                <df name="VMEvent">
+-                  <in>libVMEventTest.c</in>
+-                </df>
+                 <df name="ModuleAwareAgents">
+                   <df name="ClassFileLoadHook">
+                     <in>libMAAClassFileLoadHook.c</in>
+@@ -6172,6 +6166,9 @@
+                     <in>libAllowedFunctions.c</in>
+                   </df>
+                 </df>
++                <df name="VMEvent">
++                  <in>libVMEventTest.c</in>
++                </df>
+               </df>
+             </df>
+             <df name="testlibrary">
+@@ -40122,7 +40119,22 @@
+             tool="0"
+             flavor2="0">
+       </item>
+-      <item path="../../test/hotspot/jtreg/serviceability/jvmti/HeapMonitor/libHeapMonitorTest.c"
++      <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ClassFileLoadHook/libMAAClassFileLoadHook.c"
++            ex="false"
++            tool="0"
++            flavor2="0">
++      </item>
++      <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ClassLoadPrepare/libMAAClassLoadPrepare.c"
++            ex="false"
++            tool="0"
++            flavor2="0">
++      </item>
++      <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ThreadStart/libMAAThreadStart.c"
++            ex="false"
++            tool="0"
++            flavor2="0">
++      </item>
++      <item path="../../test/hotspot/jtreg/serviceability/jvmti/StartPhase/AllowedFunctions/libAllowedFunctions.c"
+             ex="false"
+             tool="0"
+             flavor2="0">
+@@ -40132,26 +40144,6 @@
+             tool="0"
+             flavor2="0">
+       </item>
+-      <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ClassFileLoadHook/libMAAClassFileLoadHook.c"
+-            ex="false"
+-            tool="0"
+-            flavor2="0">
+-      </item>
+-      <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ClassLoadPrepare/libMAAClassLoadPrepare.c"
+-            ex="false"
+-            tool="0"
+-            flavor2="0">
+-      </item>
+-      <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ThreadStart/libMAAThreadStart.c"
+-            ex="false"
+-            tool="0"
+-            flavor2="0">
+-      </item>
+-      <item path="../../test/hotspot/jtreg/serviceability/jvmti/StartPhase/AllowedFunctions/libAllowedFunctions.c"
+-            ex="false"
+-            tool="0"
+-            flavor2="0">
+-      </item>
+       <item path="../../test/hotspot/jtreg/testlibrary/jvmti/libSimpleClassFileLoadHook.c"
+             ex="false"
+             tool="0"
+diff -r 41779d3b85e1 src/hotspot/cpu/aarch64/aarch64.ad
+--- a/src/hotspot/cpu/aarch64/aarch64.ad	Fri Jan 04 11:03:53 2019 -0500
++++ b/src/hotspot/cpu/aarch64/aarch64.ad	Wed Oct 28 16:29:34 2020 -0400
+@@ -3418,13 +3418,7 @@
+     }
+ 
+     // Handle existing monitor
+-    // we can use AArch64's bit test and branch here but
+-    // markoopDesc does not define a bit index just the bit value
+-    // so assert in case the bit pos changes
+-#   define __monitor_value_log2 1
+-    assert(markOopDesc::monitor_value == (1 << __monitor_value_log2), "incorrect bit position");
+-    __ tbnz(disp_hdr, __monitor_value_log2, object_has_monitor);
+-#   undef __monitor_value_log2
++    __ tbnz(disp_hdr, exact_log2(markOopDesc::monitor_value), object_has_monitor);
+ 
+     // Set displaced_header to be (markOop of object | UNLOCK_VALUE).
+     __ orr(disp_hdr, disp_hdr, markOopDesc::unlocked_value);
+@@ -3455,14 +3449,6 @@
+       __ b(retry_load);
+     }
+ 
+-    // Formerly:
+-    // __ cmpxchgptr(/*oldv=*/disp_hdr,
+-    //               /*newv=*/box,
+-    //               /*addr=*/oop,
+-    //               /*tmp=*/tmp,
+-    //               cont,
+-    //               /*fail*/NULL);
+-
+     assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
+ 
+     // If the compare-and-exchange succeeded, then we found an unlocked
+@@ -3511,15 +3497,6 @@
+       __ bind(fail);
+     }
+ 
+-    // Label next;
+-    // __ cmpxchgptr(/*oldv=*/disp_hdr,
+-    //               /*newv=*/rthread,
+-    //               /*addr=*/tmp,
+-    //               /*tmp=*/rscratch1,
+-    //               /*succeed*/next,
+-    //               /*fail*/NULL);
+-    // __ bind(next);
+-
+     // store a non-null value into the box.
+     __ str(box, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+ 
+@@ -3544,9 +3521,6 @@
+ 
+   %}
+ 
+-  // TODO
+-  // reimplement this with custom cmpxchgptr code
+-  // which avoids some of the unnecessary branching
+   enc_class aarch64_enc_fast_unlock(iRegP object, iRegP box, iRegP tmp, iRegP tmp2) %{
+     MacroAssembler _masm(&cbuf);
+     Register oop = as_Register($object$$reg);
+@@ -3597,12 +3571,6 @@
+         __ b(retry_load);
+       }
+ 
+-    // __ cmpxchgptr(/*compare_value=*/box,
+-    //               /*exchange_value=*/disp_hdr,
+-    //               /*where=*/oop,
+-    //               /*result=*/tmp,
+-    //               cont,
+-    //               /*cas_failed*/NULL);
+     assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
+ 
+     __ bind(cas_failed);
+@@ -3626,7 +3594,7 @@
+     __ cbnz(rscratch1, cont);
+     // need a release store here
+     __ lea(tmp, Address(tmp, ObjectMonitor::owner_offset_in_bytes()));
+-    __ stlr(rscratch1, tmp); // rscratch1 is zero
++    __ stlr(zr, tmp); // set unowned
+ 
+     __ bind(cont);
+     // flag == EQ indicates success
+diff -r 41779d3b85e1 src/hotspot/cpu/aarch64/c1_LIRAssembler_aarch64.cpp
+--- a/src/hotspot/cpu/aarch64/c1_LIRAssembler_aarch64.cpp	Fri Jan 04 11:03:53 2019 -0500
++++ b/src/hotspot/cpu/aarch64/c1_LIRAssembler_aarch64.cpp	Wed Oct 28 16:29:34 2020 -0400
+@@ -394,7 +394,10 @@
+   __ verify_not_null_oop(r0);
+ 
+   // search an exception handler (r0: exception oop, r3: throwing pc)
+-  __ far_call(RuntimeAddress(Runtime1::entry_for(Runtime1::handle_exception_from_callee_id)));  __ should_not_reach_here();
++  __ far_call(RuntimeAddress(Runtime1::entry_for(Runtime1::handle_exception_from_callee_id)));
++  if (FatExceptionHandler != 0) {
++    __ should_not_reach_here();
++  }
+   guarantee(code_offset() - offset <= exception_handler_size(), "overflow");
+   __ end_a_stub();
+ 
+diff -r 41779d3b85e1 src/hotspot/cpu/aarch64/globals_aarch64.hpp
+--- a/src/hotspot/cpu/aarch64/globals_aarch64.hpp	Fri Jan 04 11:03:53 2019 -0500
++++ b/src/hotspot/cpu/aarch64/globals_aarch64.hpp	Wed Oct 28 16:29:34 2020 -0400
+@@ -40,7 +40,7 @@
+ define_pd_global(bool, UncommonNullCast,         true);  // Uncommon-trap NULLs past to check cast
+ 
+ define_pd_global(uintx, CodeCacheSegmentSize,    64 TIERED_ONLY(+64)); // Tiered compilation has large code-entry alignment.
+-define_pd_global(intx, CodeEntryAlignment,       64);
++define_pd_global(intx, CodeEntryAlignment,       32);
+ define_pd_global(intx, OptoLoopAlignment,        16);
+ define_pd_global(intx, InlineFrequencyCount,     100);
+ 
+@@ -162,7 +162,10 @@
+   product(int, SoftwarePrefetchHintDistance, -1,                        \
+           "Use prfm hint with specified distance in compiled code."     \
+           "Value -1 means off.")                                        \
+-          range(-1, 4096)
++          range(-1, 4096)                                               \
++  product(int, FatExceptionHandler, 1,                                  \
++          "If not 0 add debug code. If 2, use out-of-line debug code.") \
++          range(0, 4)
+ #endif
+ 
+ 
+diff -r 41779d3b85e1 src/hotspot/share/code/nmethod.cpp
+--- a/src/hotspot/share/code/nmethod.cpp	Fri Jan 04 11:03:53 2019 -0500
++++ b/src/hotspot/share/code/nmethod.cpp	Wed Oct 28 16:29:34 2020 -0400
+@@ -2564,9 +2564,10 @@
+ void nmethod::print_nmethod_labels(outputStream* stream, address block_begin) const {
+   if (block_begin == entry_point())             stream->print_cr("[Entry Point]");
+   if (block_begin == verified_entry_point())    stream->print_cr("[Verified Entry Point]");
++  if (block_begin == stub_begin())              stream->print_cr("[Stub Code]");
+   if (JVMCI_ONLY(_exception_offset >= 0 &&) block_begin == exception_begin())         stream->print_cr("[Exception Handler]");
+-  if (block_begin == stub_begin())              stream->print_cr("[Stub Code]");
+   if (JVMCI_ONLY(_deopt_handler_begin != NULL &&) block_begin == deopt_handler_begin())     stream->print_cr("[Deopt Handler Code]");
++  if (JVMCI_ONLY(_unwind_handler_offset != NULL &&) block_begin == unwind_handler_begin())     stream->print_cr("[Unwind Handler]");
+ 
+   if (has_method_handle_invokes())
+     if (block_begin == deopt_mh_handler_begin())  stream->print_cr("[Deopt MH Handler Code]");

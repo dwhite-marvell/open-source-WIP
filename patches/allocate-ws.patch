@@ -1,0 +1,119 @@
+diff -r 1ddf9a99e4ad make/nb_native/nbproject/configurations.xml
+--- a/make/nb_native/nbproject/configurations.xml	Wed Aug 22 21:50:12 2018 +0200
++++ b/make/nb_native/nbproject/configurations.xml	Wed Oct 28 14:40:57 2020 -0400
+@@ -6153,9 +6153,6 @@
+                 <df name="IsModifiableModule">
+                   <in>libIsModifiableModuleTest.c</in>
+                 </df>
+-                <df name="HeapMonitorModule">
+-                  <in>libHeapMonitorTest.c</in>
+-                </df>
+                 <df name="ModuleAwareAgents">
+                   <df name="ClassFileLoadHook">
+                     <in>libMAAClassFileLoadHook.c</in>
+@@ -40157,11 +40154,6 @@
+             tool="0"
+             flavor2="0">
+       </item>
+-      <item path="../../test/hotspot/jtreg/serviceability/jvmti/HeapMonitor/libHeapMonitorTest.c"
+-            ex="false"
+-            tool="0"
+-            flavor2="0">
+-      </item>
+       <item path="../../test/hotspot/jtreg/serviceability/jvmti/ModuleAwareAgents/ClassFileLoadHook/libMAAClassFileLoadHook.c"
+             ex="false"
+             tool="0"
+diff -r 1ddf9a99e4ad src/hotspot/cpu/aarch64/aarch64.ad
+--- a/src/hotspot/cpu/aarch64/aarch64.ad	Wed Aug 22 21:50:12 2018 +0200
++++ b/src/hotspot/cpu/aarch64/aarch64.ad	Wed Oct 28 14:40:57 2020 -0400
+@@ -14355,8 +14355,8 @@
+ 
+ instruct clearArray_imm_reg(immL cnt, iRegP_R10 base, Universe dummy, rFlagsReg cr)
+ %{
+-  predicate((u_int64_t)n->in(2)->get_long()
+-            < (u_int64_t)(BlockZeroingLowLimit >> LogBytesPerWord));
++//  predicate((u_int64_t)n->in(2)->get_long()
++//            < (u_int64_t)(BlockZeroingLowLimit >> LogBytesPerWord));
+   match(Set dummy (ClearArray cnt base));
+   effect(USE_KILL base);
+ 
+diff -r 1ddf9a99e4ad src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp
+--- a/src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp	Wed Aug 22 21:50:12 2018 +0200
++++ b/src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp	Wed Oct 28 14:40:57 2020 -0400
+@@ -5444,32 +5444,45 @@
+ #define SmallArraySize (18 * BytesPerLong)
+ void MacroAssembler::zero_words(Register base, u_int64_t cnt)
+ {
++  assert(base == r10, "mismatch in register usage");
++  Register tmp = r11;
++  
+   BLOCK_COMMENT("zero_words {");
+-  int i = cnt & 1;  // store any odd word to start
+-  if (i) str(zr, Address(base));
+ 
+   if (cnt <= SmallArraySize / BytesPerLong) {
++    int i = cnt & 1;  // store any odd word to start
++    if (i) str(zr, Address(base));
++
+     for (; i < (int)cnt; i += 2)
+       stp(zr, zr, Address(base, i * wordSize));
+   } else {
+-    const int unroll = 4; // Number of stp(zr, zr) instructions we'll unroll
+-    int remainder = cnt % (2 * unroll);
+-    for (; i < remainder; i += 2)
++    RuntimeAddress zero_blocks =  RuntimeAddress(StubRoutines::aarch64::zero_blocks());
++    assert(zero_blocks.target() != NULL, "zero_blocks stub has not been generated");    
++    assert(cnt >= zero_words_block_size, "cnt not large enough for zero_blocks stub");
++    int tail = cnt & (zero_words_block_size - 1); // words remaining to be cleared
++  
++    mov(tmp, cnt);
++    if (StubRoutines::aarch64::complete()) {
++      trampoline_call(zero_blocks);
++    } else {
++      bl(zero_blocks);
++    }
++  
++#ifdef ASSERT
++    {
++    Label ok;
++    cmp(tmp, tail);
++    br(EQ, ok);
++    stop("zero_words stub had unexpected words to zero ");
++    bind(ok);
++    }
++#endif
++  
++    int i = tail & 1;  // store any odd word to start
++    if (i) str(zr, Address(base));
++
++    for (; i < (int)tail; i += 2)
+       stp(zr, zr, Address(base, i * wordSize));
+-
+-    Label loop;
+-    Register cnt_reg = rscratch1;
+-    Register loop_base = rscratch2;
+-    cnt = cnt - remainder;
+-    mov(cnt_reg, cnt);
+-    // adjust base and prebias by -2 * wordSize so we can pre-increment
+-    add(loop_base, base, (remainder - 2) * wordSize);
+-    bind(loop);
+-    sub(cnt_reg, cnt_reg, 2 * unroll);
+-    for (i = 1; i < unroll; i++)
+-      stp(zr, zr, Address(loop_base, 2 * i * wordSize));
+-    stp(zr, zr, Address(pre(loop_base, 2 * unroll * wordSize)));
+-    cbnz(cnt_reg, loop);
+   }
+   BLOCK_COMMENT("} zero_words");
+ }
+diff -r 1ddf9a99e4ad test/hotspot/jtreg/applications/jcstress/TestGenerator.java
+--- a/test/hotspot/jtreg/applications/jcstress/TestGenerator.java	Wed Aug 22 21:50:12 2018 +0200
++++ b/test/hotspot/jtreg/applications/jcstress/TestGenerator.java	Wed Oct 28 14:40:57 2020 -0400
+@@ -40,7 +40,7 @@
+ 
+ 
+ /**
+- * @notest THIS IS NOT A TEST.
++ * @test THIS IS NOT A TEST.
+  * This is a test generator, should be run only when jcstress is changed
+  *
+  * @library /test/lib /
